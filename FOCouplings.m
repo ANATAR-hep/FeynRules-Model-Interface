@@ -1,0 +1,94 @@
+
+
+(**********************************)
+(*   Write couplings for FORM     *)
+(**********************************)
+
+TransformParameters[Parameters_List]:= Block[{Qi,ParameterValue,Subst},
+  
+  SubstitutionParameters={};
+  Do[
+    Qi=Parameters[[j]];
+    ParameterValue=Value/.MR$ParameterRules[Qi];
+
+    If[Head[(Value/.MR$ParameterRules[#]&)@Qi]=!=  List, Subst=Replace[Qi, {Qi-> {Qi-> Value/.MR$ParameterRules[Qi]}}], Subst=Replace[Qi,Qi-> Value/.MR$ParameterRules[Qi]]];
+
+    SubstitutionParameters=AppendTo[SubstitutionParameters,Subst]
+  ,{j,1,Length[Parameters]}];
+
+  SubstitutionParameters=Flatten[SubstitutionParameters];
+];
+
+ReplacementRuleListQ[expr_] := MatchQ[expr, {(_Rule | _RuleDelayed) ..}]; (* This returns True if expr is a list of rules *)
+
+(* SubstituteRules uses rule on list0 if it is defined as a list of rules *)
+SubstituteRules[list0_, rule_] := If[ReplacementRuleListQ[rule],
+   Return[list0 /. rule],
+   Return[list0]
+   ];
+
+FO$GetCoupling[CouplingObject_]:=StringReplace[CouplingObject,"CouplingObject[\"GC_"~~n:NumberString~~"\","~~gg__~~"]":>"GC"~~n~~" ="~~gg]
+
+
+Options[FO$WriteCouplings]={InternalParameters-> {}};
+
+FO$WriteCouplings[out0_,options___]:=Block[{out=out0,CouplingStrings,CouplingList,InputParameterList,subsFunctions,parameters,notSubbed},
+
+  outfile=out<>"/Couplings.frm";
+
+  InputParameterList=InternalParameters/.{options}/.Options[FO$WriteCouplings];
+
+  parameters={#[[1]],Sequence@@#[[2]]}&/@M$Parameters;
+  parameters=Replace[#,{{pp_,___,ParameterType->IE_,___,Value->FF_,___}:>{pp,IE,FF}}]&/@parameters;
+  extParam = Cases[parameters, {x___, External, y___} -> {x, y}];
+
+  notSubbed = {\[Alpha]EW, MW, sw2, cw, gs, ee, vev};
+
+  intParam=Cases[parameters,{x___,Internal,y___}->{x,y}];
+  substitutionsParam=Select[intParam,Not@MemberQ[notSubbed,#[[1]]]&];
+  substitutionsParam2=If[Head[#[[2]]]===List,Sequence@#[[2]],#[[1]]->#[[2]]]&/@substitutionsParam;
+  substitutionsParam2=Flatten@substitutionsParam2;
+
+Print[InputParameterList];
+
+Print[SubstitutionParameters];
+  TransformParameters[InputParameterList];
+Print[SubstitutionParameters];
+  (* Substitute ymt for MT, and similars. This for models using the feynrules model of the SM *)
+  SubstitutionParameters = SubstituteRules[SubstitutionParameters, FR$RmDblExt];
+Print[SubstitutionParameters];
+
+  subsFunctions = {Complex[a_,b_]:>a+im b,f___[Index[Generation,Int[x_]],Index[Generation,Int[y_]]]:>f[x,y],f___[Index[___,Int[x_]],Index[___,Int[y_]]]:>f[x,y]};
+
+  stringSubsSpecF={
+    "Sqrt["~~Shortest[x___]~~"]":>"sqrt_("<>x<>")",
+    "Cos["~~Shortest[x___]~~"]":>"cos_("<>x<>")",
+    "Sin["~~Shortest[x___]~~"]":>"sin_("<>x<>")",
+    f_~~"["~~x_~~", "~~y_~~"]":>f<>x<>"x"<>y};
+Print[PY$CouplObjects];
+  CouplingStrings = Simplify/@(PY$CouplObjects//.subsFunctions//.substitutionsParam2//.SubstitutionParameters//.subsFunctions);
+  CouplingStrings=SubstituteRules[CouplingStrings, FR$RmDblExt];
+  CouplingStrings = ToString/@InputForm/@CouplingStrings;
+  CouplingList=FO$GetCoupling[#]&/@(StringReplace[CouplingStrings, stringSubsSpecF]);
+  CouplingList=SubstituteRules[CouplingList, FR$RmDblExt];
+  CouplingList=StringReplace[CouplingList,"Conjugate["~~Shortest[x___]~~"]":>x<>"#"];
+
+  FO$NoCouplings = Length[CouplingList];
+
+  wsp="                                                                                                                             ";      
+    info=(ToString[#1]<>" : "<>If[Head[#2]===List,StringDrop[StringJoin[(#<>", "&)/@#2],-2],#2]&)@@@M$Information;
+  Print["Writing  couplings in "<>outfile];
+  OpenWrite[outfile];
+    WriteString[outfile,"\n"];    
+    WriteString[outfile,"*****  This file contains the explicit form of the couplings  *****\n"];
+    WriteString[outfile,"\n"];
+    WriteString[outfile,"#procedure Couplings\n"];
+    WriteString[outfile,".sort\n\n"];
+    (WriteString[outfile,"id   "<>#<>";\n"]&)/@CouplingList;
+    WriteString[outfile,"\n"];
+    WriteString[outfile,"#endprocedure Couplings\n\n"];
+  Close[outfile];
+
+  Return[CouplingList];
+
+]
