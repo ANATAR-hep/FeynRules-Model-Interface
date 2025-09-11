@@ -74,6 +74,7 @@ FO$WritePropagators[out0_,allFieldsInFR_]:=Block[{out=out0,outfile,Substitutions
   nonGaugedFields = DeleteCases[nonGaugedFields, _?(AntiFieldQ)];
   
   EWFields = {G0, GP, A, ghWm, W, ghWp, Z, ghZ};
+  EWFields = Select[EWFields, MemberQ[FieldsInFR, #] &];
 
   (* Substitutions to provide the indices that the fields should have at the propagator level  *)
   
@@ -136,9 +137,6 @@ FO$WritePropagators[out0_,allFieldsInFR_]:=Block[{out=out0,outfile,Substitutions
     WriteString[outfile,"\n"];
     WriteString[outfile,"#procedure Propagators\n"];
     WriteString[outfile,".sort\n\n"];
-    WriteString[outfile,"*********************************************\n"];
-    WriteString[outfile,"*    Propagators non dependent on Gauge     *\n"];
-    WriteString[outfile,"*********************************************\n\n"];
     WriteString[outfile,"id   pro(ff?Field(x?,y?partTagInt[n],?a)) = pro(ff(x,y,?a,IntLor[n]));\n"];
     WriteString[outfile,"id   pro(ff?Fermion(x?,y?partTagInt[n],p1?,iLor1?,Spin1?,iLor2?)) = pro(ff(x,y,p1,Spin1,IntSpin[n]));\n"];
     WriteString[outfile,"id   pro(ff?Fermion(x?,y?partTagInt[n],p1?,iLor1?,Spin1?,Colour1?,iLor2?)) = pro(ff(x,y,p1,Spin1,IntSpin[n],Colour1,IntColour[n]));\n"];
@@ -146,7 +144,9 @@ FO$WritePropagators[out0_,allFieldsInFR_]:=Block[{out=out0,outfile,Substitutions
     WriteString[outfile,"id   pro(ff?Gluoned(x?,y?partTagInt[n],0,iLor1?,Gluon1?,iLor2?)) = pro(ff(x,y,0,iLor1,iLor2,Gluon1,IntGluon[n]));\n"];
     WriteString[outfile,"\n"];
     WriteString[outfile,"\n"];
-    WriteString[outfile,"*****  Propagators  *****\n"];
+    WriteString[outfile,"*********************************************\n"];
+    WriteString[outfile,"*    Propagators non dependent on Gauge     *\n"];
+    WriteString[outfile,"*********************************************\n\n"];
     WriteString[outfile,"\n"];
     Do[
 
@@ -158,47 +158,51 @@ FO$WritePropagators[out0_,allFieldsInFR_]:=Block[{out=out0,outfile,Substitutions
     ,{j,1,Length[nonGaugedFields]} ];
     WriteString[outfile,"\n"];
     WriteString[outfile,"#endprocedure Propagators\n\n"];
-    WriteString[outfile,"*********************************************\n"];
-    WriteString[outfile,"*       Propagators QCD RXi Gauges          *\n"];
-    WriteString[outfile,"*********************************************\n\n"];
-    WriteString[outfile,"*****  Propagators QCD Feynman Gauge  *****\n\n"];
-    WriteString[outfile,"#procedure PropagatorsQCDFeynmanGauge\n"];
-    WriteString[outfile,".sort\n\n"];
-    WriteString[outfile,"id   pro(G(?a, p1?, Lor1?, Lor2?, Gluon1?, Gluon2?)) = -im*Den(p1, 0)*d_(Gluon1, Gluon2)*(d_(Lor1, Lor2));\n\n"];
-    WriteString[outfile,"#endprocedure PropagatorsQCDFeynmanGauge\n\n"];
-    WriteString[outfile,"*****  Propagators RXi Gauge  *****\n\n"];
-    WriteString[outfile,"#procedure PropagatorsQCDRXiGauge\n"];
-    WriteString[outfile,".sort\n\n"];
-    WriteString[outfile,"id   pro(G(?a, p1?, Lor1?, Lor2?, Gluon1?, Gluon2?)) = -im*Den(p1, 0)*d_(Gluon1, Gluon2)*(d_(Lor1, Lor2) - (1 - RXi)*(p1(Lor1)*p1(Lor2))*Den(p1,0));\n\n"];
-    WriteString[outfile,"#endprocedure PropagatorsQCDRXiGauge\n\n"];
-    WriteString[outfile,"*********************************************\n"];
-    WriteString[outfile,"*          Propagators EW Gauges            *\n"];
-    WriteString[outfile,"*********************************************\n\n"];
-    WriteString[outfile,"*****  Propagators EW Feynman Gauges  *****\n\n"];
-    WriteString[outfile,"#procedure PropagatorsEWFeynmanGauge\n"];
-    WriteString[outfile,".sort\n\n"];
-    Do[
+    If[MemberQ[FieldsInFR, G],
+      WriteString[outfile,"*********************************************\n"];
+      WriteString[outfile,"*       Propagators QCD RXi Gauges          *\n"];
+      WriteString[outfile,"*********************************************\n\n"];
+      WriteString[outfile,"*****  Propagators QCD Feynman Gauge  *****\n\n"];
+      WriteString[outfile,"#procedure PropagatorsQCDFeynmanGauge\n"];
+      WriteString[outfile,".sort\n\n"];
+      WriteString[outfile,"id   pro(G(?a, p1?, Lor1?, Lor2?, Gluon1?, Gluon2?)) = -im*Den(p1, 0)*d_(Gluon1, Gluon2)*(d_(Lor1, Lor2));\n\n"];
+      WriteString[outfile,"#endprocedure PropagatorsQCDFeynmanGauge\n\n"];
+      WriteString[outfile,"*****  Propagators RXi Gauge  *****\n\n"];
+      WriteString[outfile,"#procedure PropagatorsQCDRXiGauge\n"];
+      WriteString[outfile,".sort\n\n"];
+      WriteString[outfile,"id   pro(G(?a, p1?, Lor1?, Lor2?, Gluon1?, Gluon2?)) = -im*Den(p1, 0)*d_(Gluon1, Gluon2)*(d_(Lor1, Lor2) - (1 - RXi)*(p1(Lor1)*p1(Lor2))*Den(p1,0));\n\n"];
+      WriteString[outfile,"#endprocedure PropagatorsQCDRXiGauge\n\n"];
+    ];
+    If[EWFields=!={},
+      WriteString[outfile,"*********************************************\n"];
+      WriteString[outfile,"*          Propagators EW Gauges            *\n"];
+      WriteString[outfile,"*********************************************\n\n"];
+      WriteString[outfile,"*****  Propagators EW Feynman Gauges  *****\n\n"];
+      WriteString[outfile,"#procedure PropagatorsEWFeynmanGauge\n"];
+      WriteString[outfile,".sort\n\n"];
+      Do[
 
-      currentField=(StringReplace[#, SubstitutionsFieldsString ]&)@(ToString[InputForm[#] ]&)@(EWFields[[j]]/.SubstitutionsPropagators);
-      currentPropagator=(StringReplace[#, SubstitutionsPropatorsString ]&)@(ToString[InputForm[#] ])&@(FO$PropagatorFeynman[EWFields[[j]] ]//.{Complex[a_,b_]:>a+ im b});
+        currentField=(StringReplace[#, SubstitutionsFieldsString ]&)@(ToString[InputForm[#] ]&)@(EWFields[[j]]/.SubstitutionsPropagators);
+        currentPropagator=(StringReplace[#, SubstitutionsPropatorsString ]&)@(ToString[InputForm[#] ])&@(FO$PropagatorFeynman[EWFields[[j]] ]//.{Complex[a_,b_]:>a+ im b});
 
-      WriteString[outfile,"id   pro("<>currentField<>") = "<>currentPropagator<>";\n"]
+        WriteString[outfile,"id   pro("<>currentField<>") = "<>currentPropagator<>";\n"]
 
-    ,{j,1,Length[EWFields]} ];
-    WriteString[outfile,"\n"];
-    WriteString[outfile,"#endprocedure PropagatorsEWUnitaryGauge\n\n"];
-    WriteString[outfile,"*****  Propagators EW Unitary Gauges  *****\n\n"];
-    WriteString[outfile,"#procedure PropagatorsEWUnitaryGauge\n"];
-    WriteString[outfile,".sort\n\n"];
-    Do[
+      ,{j,1,Length[EWFields]} ];
+      WriteString[outfile,"\n"];
+      WriteString[outfile,"#endprocedure PropagatorsEWUnitaryGauge\n\n"];
+      WriteString[outfile,"*****  Propagators EW Unitary Gauges  *****\n\n"];
+      WriteString[outfile,"#procedure PropagatorsEWUnitaryGauge\n"];
+      WriteString[outfile,".sort\n\n"];
+      Do[
 
-      currentField=(StringReplace[#, SubstitutionsFieldsString ]&)@(ToString[InputForm[#] ]&)@(EWFields[[j]]/.SubstitutionsPropagators);
-      currentPropagator=(StringReplace[#, SubstitutionsPropatorsString ]&)@(ToString[InputForm[#] ])&@(FO$Propagator[EWFields[[j]] ]//.{Complex[a_,b_]:>a+ im b});
+        currentField=(StringReplace[#, SubstitutionsFieldsString ]&)@(ToString[InputForm[#] ]&)@(EWFields[[j]]/.SubstitutionsPropagators);
+        currentPropagator=(StringReplace[#, SubstitutionsPropatorsString ]&)@(ToString[InputForm[#] ])&@(FO$Propagator[EWFields[[j]] ]//.{Complex[a_,b_]:>a+ im b});
 
-      WriteString[outfile,"id   pro("<>currentField<>") = "<>currentPropagator<>";\n"]
+        WriteString[outfile,"id   pro("<>currentField<>") = "<>currentPropagator<>";\n"]
 
-    ,{j,1,Length[EWFields]} ];
-    WriteString[outfile,"\n"];
-    WriteString[outfile,"#endprocedure PropagatorsEWUnitaryGauge\n\n"];
+      ,{j,1,Length[EWFields]} ];
+      WriteString[outfile,"\n"];
+      WriteString[outfile,"#endprocedure PropagatorsEWUnitaryGauge\n\n"];
+    ];
   Close[outfile];
 ]

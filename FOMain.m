@@ -21,11 +21,13 @@ Print["https://github.com/ANATAR-hep/FeynRules-Model-Interface"];
 << "FOCouplings.m";
 
 
-QGCouplings::usage = "QGCouplings -> { \[Alpha]1, \[Alpha]2,... } is an option of QGWrite and chooses the relevant couplings in the QGraf model, which allows diagram filtering. "
+QGCouplings::usage = "QGCouplings -> { \[Alpha]1, \[Alpha]2,... } is an option of WriteFFO and chooses the relevant couplings in the QGraf model, which allows diagram filtering. "
 
-InternalParameters::usage = "InternalParameters is an option of QGWrite that specifies the internal parameters that should be re-written in terms of input parameter."
+InternalParameters::usage = "InternalParameters is an option of WriteFFO that specifies the internal parameters that should be re-written in terms of input parameter."
 
-DeleteParticles::usage = "DeleteParticles -> {u,d,...} is an option of QGWrite. It discards the vertices with the particles listed. "
+DeleteByFields::usage = "DeleteByFields -> {u,d,...} is an option of WriteFFO. It discards the vertices with the particles listed. "
+
+SelectByFields::usage = "SelectByFields -> {G,t,...} is an option of WriteFFO. It selects the vertices with the particles listed. "
 
 (* Automatize this for an arbitrary representation  *)
 MomentumFO=Array[Symbol["p"<>ToString[#]]&,10]
@@ -235,7 +237,7 @@ FO$WriteVertexQG[FRi_,couplings_,file_]:=Block[{currentCouplingPower,CouplingSpe
 
 (* QGParticleSelection deletes vertices containing the particles given as a list *)
 
-QGParticleSelection[FeynmanRules_, Particles_List] := Block[{},
+QGParticleSelection[FeynmanRules_, Particles_List] := Block[{NewFR},
 
   NewFR=FeynmanRules;
 
@@ -243,15 +245,15 @@ QGParticleSelection[FeynmanRules_, Particles_List] := Block[{},
     NewFR =  Select[NewFR, (MemberQ[Part[#, 1, ;; , 1], Particles[[ii]]] === False) &];
     , {ii, 1, Length[Particles]}];
 
+  Return[NewFR];
+
 ];
 
 
+Options[QGWrite]:=Join[Options[FeynmanRules],Options[WriteUFO],Options[FO$WriteVertices] ];
 
 
-Options[QGWrite]:=Join[Options[FeynmanRules],Options[WriteUFO], {QGCouplings -> {},InternalParameters-> {},DeleteParticles->{}}];
-
-
-QGWrite[lagrangians___,out0_, options:OptionsPattern[] ]:=Block[{lags={lagrangians},out=out0,outfile,vertices,ParticlesInVertices,Bosons,Fermions,PropagatorsBosons,PropagatorsFermions,FieldsInFR,particlesDeleted,lineLength,ast},
+QGWrite[lagrangians___,out0_, options:OptionsPattern[] ]:=Block[{lags={lagrangians},out=out0,outfile,vertices,ParticlesInVertices,Bosons,Fermions,PropagatorsBosons,PropagatorsFermions,FieldsInFR,particlesDeleted,lineLength,ast,selectbyFields,selFields},
 
 
   If[lags=!={} && Head[lags]===Plus,
@@ -260,9 +262,9 @@ QGWrite[lagrangians___,out0_, options:OptionsPattern[] ]:=Block[{lags={lagrangia
 
     (* Construct options for Feynman Rules ConservedQuantumNumbers is put to False. *)
 
-	  opts=Table[Rule[Options[QGWrite][[iii,1]],OptionValue[Options[QGWrite][[iii,1]]]],{iii,Length[Options[QGWrite]]}];
-	  opts=FilterRules[opts,First/@Options[FeynmanRules]];
-	  opts=FilterRules[opts,Except[ConservedQuantumNumbers|ScreenOutput]];
+	  opts=Table[Rule[Options[QGWrite][[iii,1]],OptionValue[Options[QGWrite][[iii,1]]] ],{iii,Length[Options[QGWrite] ]}];
+	  opts=FilterRules[opts,First/@Options[FeynmanRules] ];
+	  opts=FilterRules[opts,Except[ConservedQuantumNumbers|ScreenOutput] ];
 	  opts=Join[opts,{ConservedQuantumNumbers->False,ScreenOutput->False}];
 
     (* Set FlavorExpand from Automatic to FR$AutoFlavorExpand,and from {} to False*)
@@ -274,11 +276,18 @@ QGWrite[lagrangians___,out0_, options:OptionsPattern[] ]:=Block[{lags={lagrangia
 
   If[Head[lagrangians]===List,vertices=lagrangians];
 
+  (* vertices=NewFR; *)
 
-  particlesDeleted=OptionValue[DeleteParticles];
-  QGParticleSelection[vertices,particlesDeleted];
-  vertices=NewFR;
+  particlesDeleted=OptionValue[DeleteByFields];
 
+  If[particlesDeleted=!=None, vertices=QGParticleSelection[vertices,particlesDeleted] ];
+
+  selectbyFields[list_,fields_]:=Module[{allowed=Flatten@{fields} }, Select[list, SubsetQ[allowed,First/@First[#] ]&] ];
+
+  selFields = OptionValue[SelectByFields];
+  If[selFields=!=All,  vertices = selectbyFields[vertices,selFields] ];
+ (* Print[selFields];
+  Print[vertices]; *)
 	ParticlesInVertices=vertices[[;;,1]];
 
 
@@ -334,12 +343,25 @@ QGWrite[lagrangians___,out0_, options:OptionsPattern[] ]:=Block[{lags={lagrangia
 
 (*  Function that writes the amplitude  *)
 
-Options[WriteFFO]:=Options[QGWrite];
+Options[WriteFFO]:=Join[Options[QGWrite], Options[FO$WriteVertices] ];
   
-WriteFFO[out0_,vertices0_, opts: OptionsPattern[] ]:=Block[{out=out0,outfile,vertices=vertices0,FieldsInFR,antiFieldsInFR,nLines,allFieldsInFR,partTag,SubstitutionsPropagators,SubstitutionsPolarization,currentField,currentIndex,currentPropagator,currentPolarization,parameters,extParam,notSubbed,intParam,substitutionsParam},
+WriteFFO[out0_,vertices0_, opts: OptionsPattern[] ]:=Block[{out=out0,outfile,vertices=vertices0,FieldsInFR,antiFieldsInFR,nLines,allFieldsInFR,partTag,SubstitutionsPropagators,SubstitutionsPolarization,currentField,currentIndex,currentPropagator,currentPolarization,parameters,extParam,notSubbed,intParam,substitutionsParam,selFields},
 
    Print["--- FORM FeynRules Output (FFO) v1.0\[Beta]1 ---"];
    Print[Style["Feynman Rules already computed",Orange,Bold] ];
+
+  (* OPTIONS Select and delete by fields *)
+
+   deletebyFields[list_, forb_] := Module[{forbidden = Flatten@{forb} },  Select[list, FreeQ[First/@First[#], Alternatives @@forbidden] &] ];
+   selectbyFields[list_,fields_]:=Module[{allowed=Flatten@{fields} }, Select[list, SubsetQ[allowed,First/@First[#] ]&] ];
+
+   forbFields = OptionValue[DeleteByFields];
+   If[forbFields=!=None,  vertices = deletebyFields[vertices,forbFields] ];
+
+   selFields = OptionValue[SelectByFields];
+   If[selFields=!=All,  vertices = selectbyFields[vertices,selFields] ];
+
+   (* GET FIELDS IN FEYNMAN RULES *)
 
    FieldsInFR=(Select[#,!AntiFieldQ[#]&]&)@DeleteDuplicates@Flatten@vertices[[;;,1]];
    antiFieldsInFR=anti/@Select[FieldsInFR,Not[#=== anti@#]&];
@@ -363,8 +385,6 @@ WriteFFO[out0_,vertices0_, opts: OptionsPattern[] ]:=Block[{out=out0,outfile,ver
 
    If[DirectoryQ[out],DeleteDirectory[out,DeleteContents->True] ];
    CreateDirectory[out];
-
-  (* FO$WriteGeneral[out,FieldsInFR,antiFieldsInFR]; *)
 
   (* WriteVertices comes first as it calls the UFO routine *)
 

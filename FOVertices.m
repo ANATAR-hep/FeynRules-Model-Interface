@@ -119,39 +119,26 @@ FO$GetLorentzStruct[lorentzObjects_List,YYYY_String]:=Module[{Structures},
 
 
 (* Write vertex in terms of GC couplings *)
-(*FO$Vertex[list_List,lorentzStruct_]:=Module[{lorentzList,couplingList,colorList},
-
-  lorentzList=StringCases[Cases[list,{"lorentz",str_String}:>str][[1]],"L."~~name:WordCharacter..:>name];
-  couplingList=StringCases[Cases[list,{"couplings",str_String}:>str][[1]],"C.GC_"~~n:DigitCharacter..:>n];
-  colorList=Cases[list,{"color",str_String}:>str][[1]];
-  colorList=StringReplace[colorList,{"'"->"", "["->"", "]"->"", "("->"[", ")"->"]", "Identity" -> "FO$Delta"}];
-  colorList=(ToExpression/@StringSplit[colorList,", "])/.SubstitutionsColorFRtoForm;
-
-  If[Length[colorList]==1,
-    colorList[[1]]*Plus@@MapThread[Function[{lorentz,coupling},FO$GetLorentzStruct[lorentzStruct,lorentz]*Symbol["GC"<>coupling]],{lorentzList,couplingList}],
-    Plus@@MapThread[Function[{lorentz,coupling,color},color*FO$GetLorentzStruct[lorentzStruct,lorentz]*Symbol["GC"<>coupling]],{lorentzList,couplingList,colorList}]
-    ]
-]*)
 
 FO$Vertex[list_List,lorentzStruct_]:=Module[{lorentzList,couplingList,colorList,Positions,terms},
 
-lorentzList=StringCases[Cases[list,{"lorentz",str_String}:>str][[1]],"L."~~name:WordCharacter..:>name];
-lorentzList=FO$GetLorentzStruct[lorentzStruct,#]&/@lorentzList;
-
-couplingList=StringSplit[Cases[list,{"couplings",str_String}:>str][[1]],",("];
-couplingList=Map[(Symbol["GC"<>#]&),StringCases[#,"C.GC_"~~n:DigitCharacter..:>n]&/@couplingList,{2}];
-couplingList=Total[#]&/@couplingList;
-
-colorList=Cases[list,{"color",str_String}:>str][[1]];
-colorList=StringReplace[colorList,{"'"->"","["->"","]"->"","("->"[",")"->"]","Identity"->"FO$Delta"}];
-colorList=(ToExpression/@StringSplit[colorList,", "])/.SubstitutionsColorFRtoForm;
-
-Positions=1+ToExpression[StringCases[Cases[#,{"couplings",str_String}:>str][[1]],"("~~i:DigitCharacter..~~","~~j:DigitCharacter..~~")":>{i,j}]&@list];
-
-terms={};
-Do[ terms=Append[terms,colorList[[Positions[[i,1]]]]*lorentzList[[Positions[[i,2]]]]*couplingList[[i]]],{i,1,Length[Positions]}];
-terms=Total[terms];
-Return[terms];
+  lorentzList=StringCases[Cases[list,{"lorentz",str_String}:>str][[1]],"L."~~name:WordCharacter..:>name];
+  lorentzList=FO$GetLorentzStruct[lorentzStruct,#]&/@lorentzList;
+  
+  couplingList=StringSplit[Cases[list,{"couplings",str_String}:>str][[1]],",("];
+  couplingList=Map[(Symbol["GC"<>#]&),StringCases[#,"C.GC_"~~n:DigitCharacter..:>n]&/@couplingList,{2}];
+  couplingList=Total[#]&/@couplingList;
+  
+  colorList=Cases[list,{"color",str_String}:>str][[1]];
+  colorList=StringReplace[colorList,{"'"->"","["->"","]"->"","("->"[",")"->"]","Identity"->"FO$Delta"}];
+  colorList=(ToExpression/@StringSplit[colorList,", "])/.SubstitutionsColorFRtoForm;
+  
+  Positions=1+ToExpression[StringCases[Cases[#,{"couplings",str_String}:>str][[1]],"("~~i:DigitCharacter..~~","~~j:DigitCharacter..~~")":>{i,j}]&@list];
+  
+  terms={};
+  Do[ terms=Append[terms,colorList[[Positions[[i,1]]]]*lorentzList[[Positions[[i,2]]]]*couplingList[[i]]],{i,1,Length[Positions]}];
+  terms=Total[terms];
+  Return[terms];
 
 ];
 
@@ -191,32 +178,6 @@ GCouplingsEquivalencies[couplingsRules_List]:=Module[{GroupedbyRHS,firstGCi},
 (* Function to add the repeat lines to vertices with dummy indices *)
 
 IdentifyiGluons[line_String] := DeleteDuplicates[StringCases[line, "iGluon" ~~ DigitCharacter ..] ];
-
-(* modifyVerticesFile[file_]:=Module[{content,modifiedContent,lines,stringQ,modifiedLines,newFile},
-
-  content=Import[file,"Text"];
-
-  (*Identify lines containing "iGluon999"*)
-
-  lines=StringSplit[content,"\n"];
-  stringQ=StringContainsQ[lines,"iGluon999"];
-  modifiedLines=Position[stringQ,True];
-
-  (*Modify the lines*)
-
-  Do[
-    modifiedContent=StringInsert[lines[[modifiedLines[[ii]]]],"repeat;\n",1];
-    modifiedContent=StringReplace[modifiedContent,"id "-> "id, once "];
-    lines[[modifiedLines[[ii]]]]=StringInsert[modifiedContent,"\nsum iGluon999;\nendrepeat;\n.sort",-1],
-
-  {ii,1,Length@modifiedLines}];
-
-  newFile=StringRiffle[lines,"\n"];
-  newFile=StringInsert[newFile,"\n",-1];
-
-
-  Export[file,newFile,"Text"]
-] *)
 
 (* modifyVertices adds the repeat and id, once statements whenever there is an iGluon index *)
 
@@ -312,24 +273,22 @@ modifyVerticesGluon[file_]:=Module[{content,modifiedContent,lines,stringQ,modifi
 
 (* Options of WriteVertices *)
 
-Options[FO$WriteVertices]={InternalParameters-> {}};
-
-
+Options[FO$WriteVertices]:={QGCouplings -> {}, InternalParameters-> {}, SelectByFields->All, DeleteByFields->None};
 
 
 (*  Write Feynman Rules *)
 
-FO$WriteVertices[out0_,FeynmanRules0_,opts:options___]:=Block[{out=out0,FeynmanRules=FeynmanRules0,outfile,VRTX,verticesExpressions,InputParameterList,Qi,ParameterValue,Subst,Fermions,CouplingswIm,newCouplings,CouplingList,stringSubstitutions,fieldVertexSubs,exprsVertexSubs,ast,lineLength},
+FO$WriteVertices[out0_,FeynmanRules0_,opts:OptionsPattern[] ]:=Block[{out=out0,FeynmanRules=FeynmanRules0,outfile,VRTX,verticesExpressions,InputParameterList,Qi,ParameterValue,Subst,Fermions,CouplingswIm,newCouplings,CouplingList,stringSubstitutions,fieldVertexSubs,exprsVertexSubs,ast,lineLength},
 
   (* Routine for creating the list of substitutions of the desired parameters *)
 
-  InputParameterList=InternalParameters/.{options}/.Options[FO$WriteVertices];
+  InputParameterList=InternalParameters;(*/.{options}/.Options[FO$WriteVertices]; *)
   SubstitutionParameters={};
   Do[
     Qi=InputParameterList[[j]];
     ParameterValue=Value/.MR$ParameterRules[Qi];
 
-    If[Head[(Value/.MR$ParameterRules[#]&)@Qi]=!=  List, Subst=Replace[Qi, {Qi-> {Qi-> Value/.MR$ParameterRules[Qi]}}], Subst=Replace[Qi,Qi-> Value/.MR$ParameterRules[Qi]]];
+    If[Head[(Value/.MR$ParameterRules[#]&)@Qi]=!=  List, Subst=Replace[Qi, {Qi-> {Qi-> Value/.MR$ParameterRules[Qi]}}], Subst=Replace[Qi,Qi-> Value/.MR$ParameterRules[Qi] ] ];
 
     SubstitutionParameters=AppendTo[SubstitutionParameters,Subst]
   ,{j,1,Length[InputParameterList]}];
@@ -342,16 +301,23 @@ FO$WriteVertices[out0_,FeynmanRules0_,opts:options___]:=Block[{out=out0,FeynmanR
 
   Fermions=Select[allFieldsInFR,FermionQ[#]&&Not[GhostFieldQ[#]===True]&];
 
+ (* OPTIONS Select and delete by fields *)
 
+  forbFields = OptionValue[DeleteByFields];
+
+  If[forbFields=!=None,  FeynmanRules = deletebyFields[FeynmanRules,forbFields] ];
+
+  selFields = OptionValue[SelectByFields];
+
+  If[selFields=!=All,  FeynmanRules = selectbyFields[FeynmanRules,selFields] ];
 
   (* Organization of the vertices functions  *)
 
-  VRTX=vrtx@@@(FeynmanRules0[[;;,1]]/.{
+  VRTX=vrtx@@@(FeynmanRules[[;;,1]]/.{
   {Field_,index_?(NumericQ[#]&)}:> Field [TagIndex[[index]],MomentumFO[[index]],LorentzIndexFO[[index]],IndicesSequence[Field,index]]
   });
 
   (* Substituted expressions of the Feynman Rules  *)
-
 
   (* verticesExpressions=FeynmanRules0[[;;,2]]//.SubstitutionsFRtoForm//.SubstitutionParameters//.{Complex[a_,b_]:>a+ im b}//Simplify; *)
 
@@ -386,11 +352,6 @@ FO$WriteVertices[out0_,FeynmanRules0_,opts:options___]:=Block[{out=out0,FeynmanR
 
    verticesExpressions = Simplify[verticesExpressions/.equalGCouplings];
 
-  (* stringSubstitutions = {
-
-    "iGluon10" :> "iGluon999"
-
-  }; *)
 
   fieldVertexSubs = {
     ("PartTag"~~char:LetterCharacter):>"?"<>char,
@@ -413,7 +374,6 @@ FO$WriteVertices[out0_,FeynmanRules0_,opts:options___]:=Block[{out=out0,FeynmanR
       "]"-> ")",
       "FO$Gamma"-> "GammaM",
       "FO$Dot[" ~~Shortest[ p1___ ] ~~ ", " ~~ Shortest[p2___] ~~ "]" :> p1 <> "." <> p2
-      (* "iGluon10" :> "iGluon999" *)
 };
 
 
@@ -456,10 +416,7 @@ FO$WriteVertices[out0_,FeynmanRules0_,opts:options___]:=Block[{out=out0,FeynmanR
       If[comma,WriteString[outfile,";\n\n"] ];
 
   	  comma=False;
-      (* WriteString[outfile,"\nid \t"<>((StringReplace[#,("PartTag"~~char:LetterCharacter):>"?"<>char]&)@(StringReplace[#,("p"~~char:DigitCharacter):>"p"<>char<>"?"]&)@(StringReplace[#,("Lor"~~char:DigitCharacter):>"Lor"<>char<>"?"]&)@(StringReplace[#,("Spin"~~char:DigitCharacter):>"Spin"<>char<>"?"]&)@(StringReplace[#,("Gluon"~~char:DigitCharacter):>"Gluon"<>char<>"?"]&)@(StringReplace[#,("Colour"~~char:DigitCharacter):>"Colour"<>char<>"?"]&)@(StringReplace[#,"["-> "("]&)@(StringReplace[#,"]"-> ")"]&)@(ToString[InputForm[#] ])&)@VRTX[[j]]]; *)
       WriteString[outfile,"\nid \t"<>((StringReplace[#,fieldVertexSubs]&)@(ToString[InputForm[#] ])&)@VRTX[[j]]];
-
-      (* WriteString[outfile,"\t = \t "<>((StringReplace[#,{"Sqrt"-> "sqrt_","Im"->"im"}]&)@(StringReplace[#,"FO$Metric"-> "d_"]&)@(StringReplace[#,"FO$Delta"-> "d_"]&)@(StringReplace[#,("QuestionMark"~~char:LetterCharacter):>"?"<>char]&)@(StringReplace[#,"["-> "("]&)@(StringReplace[#,"]"-> ")"]&)@(StringReplace[#,"FO$Gamma"-> "GammaM"]&)@(StringReplace[ #,"FO$Dot[" ~~Shortest[ p1___ ] ~~ ", " ~~ Shortest[p2___] ~~ "]" :> p1 <> "." <> p2]&)@(StringReplace[#,stringSubstitutions]&)@(ToString[InputForm[#] ])&)@verticesExpressions[[j]] ]; *)
       WriteString[outfile,"\t = \t "<>((StringReplace[#,exprsVertexSubs]&)@(ToString[InputForm[#] ])&)@verticesExpressions[[j]] ];
       WriteString[outfile,";\n"];
     ,{j,1,Length[verticesExpressions]}];
